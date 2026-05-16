@@ -48,7 +48,6 @@
 
   onAuthStateChanged(auth, (user) => {
       if (user) {
-          // Admin check (Oya illapu widihata email eken check karanawa)
           if(user.email === 'goldenmoon2020lj@gmail.com') {
               sessionStorage.setItem('dealerUser', 'admin');
               sessionStorage.setItem('isAdmin', 'true');
@@ -58,7 +57,6 @@
           }
           sessionStorage.setItem('isLoggedIn', 'true');
 
-          // Login unata passe witharai data ghanne
           onValue(dataRef, (snapshot) => {
               const cloudData = snapshot.val();
               if (cloudData) {
@@ -224,6 +222,7 @@
 <datalist id="globalItemOptions"></datalist>
 <datalist id="globalShopOptions"></datalist> 
 <datalist id="ordShopList"></datalist>
+<datalist id="penAllShopList"></datalist>
 
 <div id="imgModal" class="modal-overlay" onclick="this.style.display='none'"><img id="modalImg" src="" style="max-width:90%; max-height:90%; border:3px solid white; border-radius:8px;"></div>
 
@@ -303,20 +302,49 @@
     </div>
 
     <div class="nav-tabs" id="mainNav">
+        <button onclick="changeTab('growth')" id="t-growth" class="active" style="background:var(--growth); color:white;">📈 Business Growth</button>
         <button onclick="changeTab('shops')" id="t-shops">Register Shops</button>
-        <button onclick="changeTab('orders')" id="t-orders" class="active">Orders (Pending)</button>
-        <button onclick="changeTab('stock')" id="t-stock">Inventory / Stock</button>
+        <button onclick="changeTab('mapView')" id="t-mapView" style="background:#f39c12; color:white;">🗺️ Shop Map</button>
+        <button onclick="changeTab('orders')" id="t-orders">Orders (Pending)</button>
         <button onclick="changeTab('pending-pay')" id="t-pending-pay">Pending Payments</button>
         <button onclick="changeTab('overdue')" id="t-overdue" style="background:var(--danger); color:white;">🚨 Overdue</button>
         <button onclick="changeTab('finished-pay')" id="t-finished-pay">Payment Finished</button>
-        <button onclick="changeTab('returns')" id="t-returns">Return Items</button>
-        <button onclick="changeTab('deleted')" id="t-deleted">Deleted Records</button>
+        <button onclick="changeTab('pending-all')" id="t-pending-all" style="background:#e67e22; color:white;">Shop Pending Invoices</button>
         <button onclick="changeTab('messages')" id="t-messages" style="background:var(--info); color:white;">💬 SMS & WA Alerts</button>
-        <button onclick="changeTab('mapView')" id="t-mapView" style="background:#f39c12; color:white;">🗺️ Shop Map</button>
-        <button onclick="changeTab('growth')" id="t-growth" style="background:var(--growth); color:white;">📈 Business Growth</button>
+        <button onclick="changeTab('returns')" id="t-returns">Return Items</button>
+        <button onclick="changeTab('stock')" id="t-stock">Inventory / Stock</button>
+        <button onclick="changeTab('deleted')" id="t-deleted">Deleted Records</button>
+        <button onclick="changeTab('day-sale')" id="t-day-sale" style="background:#27ae60; color:white;">Day Sale Report</button>
         
         <button onclick="changeTab('dealers')" id="t-dealers" class="admin-only" style="background:var(--admin); color:white; margin-left:20px;">👨‍💼 Manage Dealers</button>
         <button onclick="changeTab('items')" id="t-items" class="admin-only" style="background:#d35400; color:white;">📦 Item Management</button>
+    </div>
+
+    <div id="growth" class="tab-content active">
+        <div class="box" style="border-left: 5px solid var(--growth);">
+            <h3 style="color:var(--growth); margin-top:0;">📈 Business Growth & Sales Record</h3>
+            <div style="display:flex; gap:15px; margin-bottom: 20px; background: #ecf0f1; padding: 15px; border-radius: 8px;">
+                <div class="admin-only" id="grDealerDiv"><label style="font-weight:bold;">Filter by Dealer:</label> <select id="grDealerFilter" onchange="renderGrowth()"></select></div>
+                <div><label style="font-weight:bold;">Year:</label> <select id="grYearFilter" onchange="renderGrowth()"></select></div>
+            </div>
+            
+            <div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #ddd;">
+                <canvas id="growthLineChart" height="80"></canvas>
+            </div>
+
+            <div class="grid" style="margin-bottom:30px;">
+                <div class="admin-only" id="grAdminDiv" style="background:#dff9fb; padding:20px; border-radius:10px; text-align:center;"><h4>Admin Revenue (Income)</h4><h2 id="grAdminRev" style="color:#2c3e50; margin:0;">Rs. 0.00</h2></div>
+                <div style="background:#f1f2f6; padding:20px; border-radius:10px; text-align:center;"><h4 id="grProfTitle">My Profit</h4><h2 id="grDealerProf" style="color:#2c3e50; margin:0;">Rs. 0.00</h2></div>
+                <div style="background:#e8f8f5; padding:20px; border-radius:10px; text-align:center;"><h4>Total Shop Sales</h4><h2 id="grTotalSales" style="color:#27ae60; margin:0;">Rs. 0.00</h2></div>
+            </div>
+
+            <hr style="margin:30px 0;">
+            <h3 style="color:var(--primary);">📦 Item-Wise Details (Qty & Revenue/Profit)</h3>
+            <table id="tbl-gr-items" style="width:100%;">
+                <thead><tr><th>Item Name</th><th>Total Sold Qty</th><th>Revenue/Profit Generated</th></tr></thead>
+                <tbody id="grItemsBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="shops" class="tab-content">
@@ -360,29 +388,19 @@
         <div id="pg-shops"></div>
     </div>
 
-    <div id="stock" class="tab-content">
-        <div class="box">
-            <h3>Manual Stock Entry</h3>
-            <div class="grid">
-                <div><label style="font-weight:bold;">Select Item:</label><input list="globalItemOptions" id="stItemSelect" placeholder="Type Item Name to Select..." autocomplete="off"></div>
-                <div><label style="font-weight:bold;">Quantity (+):</label><input type="number" id="stQty" placeholder="Add Quantity (+)"></div>
+    <div id="mapView" class="tab-content">
+        <div class="box" style="padding: 10px;">
+            <h3>🗺️ Live Shop Location Map</h3>
+            <div class="admin-only" style="margin-bottom: 10px; background:#ecf0f1; padding:10px; border-radius:5px;">
+                <label style="font-weight:bold;">Filter Map by Dealer:</label>
+                <select id="mapDealerFilter" onchange="initLeafletMap()"></select>
             </div>
-            <button class="btn btn-info" style="padding:10px; width:100%; margin-top:10px;" onclick="updateStockManual()">ADD TO STOCK</button>
+            <p style="font-size:13px; color:#555; margin-top:0;">Map point markers show registered shop locations.</p>
+            <div id="shopMap" style="height: 600px; width: 100%; border-radius: 10px; z-index: 1;"></div>
         </div>
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <div class="admin-only"><strong>Dealer:</strong> <select id="fStockDealer" onchange="filterRender('stock')"></select></div>
-            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-stock', 'Inventory_Stock')">📄 DOWNLOAD PDF</button>
-        </div>
-        <table id="tbl-stock">
-            <thead>
-                <tr><th>#</th><th class="admin-only">Dealer</th><th>Image/Name</th><th>Total Stock</th><th>Items Sold</th><th>Returned Qty</th><th>Current Available</th></tr>
-            </thead>
-            <tbody id="stockBody"></tbody>
-        </table>
-        <div id="pg-stock"></div>
     </div>
 
-    <div id="orders" class="tab-content active">
+    <div id="orders" class="tab-content">
         <div class="box">
             <h3 id="ordTitle">Place / Update Order</h3>
             <input type="hidden" id="editOrdIdx" value="-1">
@@ -475,32 +493,27 @@
         <div id="pg-finPay"></div>
     </div>
 
-    <div id="returns" class="tab-content">
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <div class="admin-only"><strong>Dealer:</strong> <select id="fRetDealer" onchange="filterRender('returns')"></select></div>
-            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-returns', 'Return_Items')">📄 DOWNLOAD PDF</button>
+    <div id="pending-all" class="tab-content">
+        <div class="box" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; background:#fdebd0;">
+            <div><strong>📂 Category:</strong> <select id="penAllCat" onchange="updatePenAllShops()">
+                <option value="">All Categories</option>
+                <option value="Company">Company</option>
+                <option value="Service Center">Service Center</option>
+                <option value="Spare Parts Shop">Spare Parts Shop</option>
+                <option value="Other">Other</option>
+            </select></div>
+            <div><strong>🏪 Shop:</strong> <input list="penAllShopList" id="penAllShop" placeholder="Type Shop Name to Select..." autocomplete="off" onchange="filterRender('penAll')" style="margin-top:0;"></div>
+            <button class="btn btn-info" onclick="resetFilters()">Reset All</button>
         </div>
-        <table id="tbl-returns">
-            <thead>
-                <tr><th>#</th><th class="admin-only">Dealer</th><th>Date</th><th>Shop</th><th>Inv Ref</th><th>Returned Item(s)</th><th>Reason</th><th style="width:130px;">Action</th></tr>
-            </thead>
-            <tbody id="retBody"></tbody>
-        </table>
-        <div id="pg-ret"></div>
-    </div>
-
-    <div id="deleted" class="tab-content">
         <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
-            <div class="admin-only"><strong>Dealer:</strong> <select id="fDelDealer" onchange="filterRender('deleted')"></select></div>
-            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-deleted', 'Deleted_Records')">📄 DOWNLOAD PDF</button>
+            <button class="btn btn-pdf" onclick="downloadPDF('tbl-pending-all', 'Shop Pending Invoices Report')">📄 DOWNLOAD SHOP PENDING (PDF)</button>
         </div>
-        <table id="tbl-deleted">
-            <thead>
-                <tr><th>#</th><th class="admin-only">Dealer</th><th>Category</th><th>Reference & Details</th><th>Reason</th><th>Date</th><th style="width:100px;">Action</th></tr>
-            </thead>
-            <tbody id="deletedBody"></tbody>
+        <table id="tbl-pending-all">
+            <thead><tr><th>#</th><th>Shop Name</th><th>Inv No</th><th>Date</th><th>Items</th><th>Grand Total</th><th>Paid</th><th>Balance</th><th style="width:140px;">Action</th></tr></thead>
+            <tbody id="penAllBody"></tbody>
+            <tfoot id="penAllFooter" style="background:#ecf0f1; font-weight:bold;"></tfoot>
         </table>
-        <div id="pg-del"></div>
+        <div id="pg-penAll"></div>
     </div>
 
     <div id="messages" class="tab-content">
@@ -545,16 +558,96 @@
         </div>
     </div>
 
-    <div id="mapView" class="tab-content">
-        <div class="box" style="padding: 10px;">
-            <h3>🗺️ Live Shop Location Map</h3>
-            <div class="admin-only" style="margin-bottom: 10px; background:#ecf0f1; padding:10px; border-radius:5px;">
-                <label style="font-weight:bold;">Filter Map by Dealer:</label>
-                <select id="mapDealerFilter" onchange="initLeafletMap()"></select>
-            </div>
-            <p style="font-size:13px; color:#555; margin-top:0;">Map point markers show registered shop locations.</p>
-            <div id="shopMap" style="height: 600px; width: 100%; border-radius: 10px; z-index: 1;"></div>
+    <div id="returns" class="tab-content">
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="admin-only"><strong>Dealer:</strong> <select id="fRetDealer" onchange="filterRender('returns')"></select></div>
+            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-returns', 'Return_Items')">📄 DOWNLOAD PDF</button>
         </div>
+        <table id="tbl-returns">
+            <thead>
+                <tr><th>#</th><th class="admin-only">Dealer</th><th>Date</th><th>Shop</th><th>Inv Ref</th><th>Returned Item(s)</th><th>Reason</th><th style="width:130px;">Action</th></tr>
+            </thead>
+            <tbody id="retBody"></tbody>
+        </table>
+        <div id="pg-ret"></div>
+    </div>
+
+    <div id="stock" class="tab-content">
+        <div class="box">
+            <h3>Manual Stock Entry</h3>
+            <div class="grid">
+                <div><label style="font-weight:bold;">Select Item:</label><input list="globalItemOptions" id="stItemSelect" placeholder="Type Item Name to Select..." autocomplete="off"></div>
+                <div><label style="font-weight:bold;">Quantity (+):</label><input type="number" id="stQty" placeholder="Add Quantity (+)"></div>
+            </div>
+            <button class="btn btn-info" style="padding:10px; width:100%; margin-top:10px;" onclick="updateStockManual()">ADD TO STOCK</button>
+        </div>
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="admin-only"><strong>Dealer:</strong> <select id="fStockDealer" onchange="filterRender('stock')"></select></div>
+            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-stock', 'Inventory_Stock')">📄 DOWNLOAD PDF</button>
+        </div>
+        <table id="tbl-stock">
+            <thead>
+                <tr><th>#</th><th class="admin-only">Dealer</th><th>Image/Name</th><th>Total Stock</th><th>Items Sold</th><th>Returned Qty</th><th>Current Available</th></tr>
+            </thead>
+            <tbody id="stockBody"></tbody>
+        </table>
+        <div id="pg-stock"></div>
+    </div>
+
+    <div id="deleted" class="tab-content">
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="admin-only"><strong>Dealer:</strong> <select id="fDelDealer" onchange="filterRender('deleted')"></select></div>
+            <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-deleted', 'Deleted_Records')">📄 DOWNLOAD PDF</button>
+        </div>
+        <table id="tbl-deleted">
+            <thead>
+                <tr><th>#</th><th class="admin-only">Dealer</th><th>Category</th><th>Reference & Details</th><th>Reason</th><th>Date</th><th style="width:100px;">Action</th></tr>
+            </thead>
+            <tbody id="deletedBody"></tbody>
+        </table>
+        <div id="pg-del"></div>
+    </div>
+
+    <div id="day-sale" class="tab-content">
+        <div class="box" style="display:flex; gap:15px; align-items:center; flex-wrap:wrap; background:#d5f5e3;">
+            <div><strong>📅 Select Date:</strong> <input type="date" id="daySaleDate" onchange="filterRender('daySale')"></div>
+            <div><strong>📦 Item Name:</strong> <input list="globalItemOptions" id="daySaleItem" placeholder="Type specific item or leave blank for ALL" onchange="filterRender('daySale')"></div>
+            <button class="btn btn-info" onclick="resetFilters()">Reset All</button>
+        </div>
+        <div class="grid" style="margin-bottom:15px;">
+            <div class="box" style="text-align:center; background:#d5f5e3; border-left:5px solid var(--accent);">
+                <h3>✅ Paid (Finished) Income</h3><h2 id="dsFinInc" style="color:var(--accent);">Rs. 0.00</h2>
+            </div>
+            <div class="box" style="text-align:center; background:#fdebd0; border-left:5px solid var(--edit);">
+                <h3>⏳ Pending Income</h3><h2 id="dsPenInc" style="color:var(--edit);">Rs. 0.00</h2>
+            </div>
+            <div class="box" style="text-align:center; background:#ebf5fb; border-left:5px solid var(--info);">
+                <h3>Total Day Revenue</h3><h2 id="dsTotInc" style="color:var(--info);">Rs. 0.00</h2>
+            </div>
+            <div class="box" style="text-align:center; background:#eaeded; border-left:5px solid var(--primary);">
+                <h3>Total Day Profit</h3><h2 id="dsTotProf" style="color:var(--primary);">Rs. 0.00</h2>
+            </div>
+        </div>
+
+        <h3 style="color:var(--accent); border-bottom: 2px solid var(--accent); padding-bottom: 5px; display:flex; justify-content:space-between; align-items:center;">
+            ✅ Finished Sales (Paid)
+            <button class="btn btn-pdf" style="margin:0; width:auto; padding:5px 10px;" onclick="downloadPDF('tbl-day-sale-fin', 'Day Sale Finished Report')">📄 PDF</button>
+        </h3>
+        <table id="tbl-day-sale-fin">
+            <thead><tr><th>Item Name</th><th>Sold Qty</th><th>Income (Revenue)</th><th>Cost (Expense)</th><th>Profit</th></tr></thead>
+            <tbody id="daySaleFinBody"></tbody>
+            <tfoot id="daySaleFinFooter" style="background:#ecf0f1; font-weight:bold;"></tfoot>
+        </table>
+
+        <h3 style="color:var(--edit); border-bottom: 2px solid var(--edit); padding-bottom: 5px; margin-top:30px; display:flex; justify-content:space-between; align-items:center;">
+            ⏳ Pending Sales (To be Paid)
+            <button class="btn btn-pdf" style="margin:0; width:auto; padding:5px 10px;" onclick="downloadPDF('tbl-day-sale-pen', 'Day Sale Pending Report')">📄 PDF</button>
+        </h3>
+        <table id="tbl-day-sale-pen">
+            <thead><tr><th>Item Name</th><th>Sold Qty</th><th>Income (Revenue)</th><th>Cost (Expense)</th><th>Profit</th></tr></thead>
+            <tbody id="daySalePenBody"></tbody>
+            <tfoot id="daySalePenFooter" style="background:#ecf0f1; font-weight:bold;"></tfoot>
+        </table>
     </div>
 
     <div id="dealers" class="tab-content admin-only">
@@ -582,33 +675,6 @@
         </table>
     </div>
 
-    <div id="growth" class="tab-content">
-        <div class="box" style="border-left: 5px solid var(--growth);">
-            <h3 style="color:var(--growth); margin-top:0;">📈 Business Growth & Sales Record</h3>
-            <div style="display:flex; gap:15px; margin-bottom: 20px; background: #ecf0f1; padding: 15px; border-radius: 8px;">
-                <div class="admin-only" id="grDealerDiv"><label style="font-weight:bold;">Filter by Dealer:</label> <select id="grDealerFilter" onchange="renderGrowth()"></select></div>
-                <div><label style="font-weight:bold;">Year:</label> <select id="grYearFilter" onchange="renderGrowth()"></select></div>
-            </div>
-            
-            <div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 10px; border: 1px solid #ddd;">
-                <canvas id="growthLineChart" height="80"></canvas>
-            </div>
-
-            <div class="grid" style="margin-bottom:30px;">
-                <div class="admin-only" id="grAdminDiv" style="background:#dff9fb; padding:20px; border-radius:10px; text-align:center;"><h4>Admin Revenue (Income)</h4><h2 id="grAdminRev" style="color:#2c3e50; margin:0;">Rs. 0.00</h2></div>
-                <div style="background:#f1f2f6; padding:20px; border-radius:10px; text-align:center;"><h4 id="grProfTitle">My Profit</h4><h2 id="grDealerProf" style="color:#2c3e50; margin:0;">Rs. 0.00</h2></div>
-                <div style="background:#e8f8f5; padding:20px; border-radius:10px; text-align:center;"><h4>Total Shop Sales</h4><h2 id="grTotalSales" style="color:#27ae60; margin:0;">Rs. 0.00</h2></div>
-            </div>
-
-            <hr style="margin:30px 0;">
-            <h3 style="color:var(--primary);">📦 Item-Wise Details (Qty & Revenue/Profit)</h3>
-            <table id="tbl-gr-items" style="width:100%;">
-                <thead><tr><th>Item Name</th><th>Total Sold Qty</th><th>Revenue/Profit Generated</th></tr></thead>
-                <tbody id="grItemsBody"></tbody>
-            </table>
-        </div>
-    </div>
-
     <div id="items" class="tab-content admin-only">
         <div class="box" style="border-left: 5px solid #d35400;">
             <h3 id="itTitle" style="color:#d35400; margin-top:0;">📦 Register New Item per Dealer</h3>
@@ -628,7 +694,7 @@
             </div>
             <button class="btn btn-save" style="background:#d35400;" onclick="saveItem()" id="itBtn">SAVE ITEM DATA</button>
         </div>
-        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; justify-content: space-between;">
+        <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: gap: 15px; align-items: center; justify-content: space-between;">
             <div><strong>👤 Filter by Dealer:</strong> <select id="fItemDealer" onchange="filterRender('items')"></select></div>
             <button class="btn btn-pdf admin-only" onclick="downloadPDF('tbl-items', 'Registered_Items')">📄 DOWNLOAD PDF</button>
         </div>
@@ -735,7 +801,7 @@
     window.db = JSON.parse(localStorage.getItem('YENU_ERP_DB')) || { dealers: [], shops: [], items: [], orders: [], sales: [], returns: [], deleted: [] };
     
     let tempImg = ""; let activeInvOrder = null; let currentUser = ""; let isAdmin = false; let myLineChart = null; let mapInstance = null;
-    let curPage = { shops: 1, items: 1, stock: 1, orders: 1, penPay: 1, overdue: 1, finPay: 1, ret: 1, del: 1 };
+    let curPage = { shops: 1, items: 1, stock: 1, orders: 1, penPay: 1, overdue: 1, finPay: 1, ret: 1, del: 1, penAll: 1, daySale: 1 };
     let PAGE_LIMIT = 10;
     let logoutTimer;
 
@@ -814,7 +880,7 @@
             document.getElementById('grAdminDiv').classList.add('hide-for-dealer');
         }
 
-        let savedTab = sessionStorage.getItem('activeTab') || (isAdmin ? 'growth' : 'orders');
+        let savedTab = sessionStorage.getItem('activeTab') || 'growth';
         changeTab(savedTab);
         resetAutoLogout();
         render();
@@ -986,7 +1052,8 @@
     window.getInvoiceMessage = function(s) {
         let itemsTxt = (s.items||[]).map(it => `${it.n} - Rs.${fmtNum(it.p)} x ${it.q} = Rs.${fmtNum(it.p*it.q)}`).join('\n');
         let bal = s.grand - (s.adv||0) - (s.paid||0);
-        return `*YENUFLEX RUBBER PRODUCTS*\n----------------------\n*Invoice No:* ${s.inv}\n*Date:* ${s.date}\n*Shop:* ${s.shop}\n----------------------\n*Items:*\n${itemsTxt}\n----------------------\n*Sub Total:* Rs. ${fmtNum(s.grand)}\n*Advance:* Rs. ${fmtNum(s.adv||0)}\n*Paid:* Rs. ${fmtNum(s.paid||0)}\n*Balance:* Rs. ${fmtNum(bal)}\n----------------------\nThank you!`;
+        let invTypeStr = bal <= 0.01 ? "FINISHED INVOICE" : "PENDING INVOICE";
+        return `*YENUFLEX RUBBER PRODUCTS*\n----------------------\n*${invTypeStr}*\n*Invoice No:* ${s.inv}\n*Date:* ${s.date}\n*Shop:* ${s.shop}\n----------------------\n*Items:*\n${itemsTxt}\n----------------------\n*Sub Total:* Rs. ${fmtNum(s.grand)}\n*Paid:* Rs. ${fmtNum((s.adv||0) + (s.paid||0))}\n*Balance:* Rs. ${fmtNum(bal <= 0.01 ? 0 : bal)}\n----------------------\nThank you!`;
     };
     
     window.updateSmsInvoices = function() { const sh = document.getElementById('smsShop').value; const sD = document.getElementById('smsDate').value; document.getElementById('smsInv').innerHTML = window.db.sales.filter(s => s.shop === sh && s.date === sD).map(s => `<option value="${s.inv}">${s.inv}</option>`).join('') || '<option value="">No Invoices Found</option>'; };
@@ -1288,8 +1355,8 @@
         setTimeout(() => {
             const sh = window.db.shops.find(x => x.name === sale.shop);
             let waNum = sh && sh.p1 ? sh.p1 : "No Number";
-            if(confirm(`Do you want to send this invoice via WhatsApp to ${waNum}? \n(OK to Send, Cancel to Skip)`)) {
-                sendSpecificWhatsApp(sale);
+            if(confirm(`Do you want to send this invoice via SMS to ${waNum}? \n(OK to Send SMS, Cancel to Skip)`)) {
+                sendSpecificSMS(sale);
             }
         }, 1000);
     };
@@ -1492,6 +1559,23 @@
         });
     };
 
+    window.updatePenAllShops = function() {
+        const cat = document.getElementById('penAllCat').value;
+        const datalist = document.getElementById('penAllShopList');
+        let shops = window.db.shops.filter(s => cat === "" || (s.category || 'Other') === cat);
+        datalist.innerHTML = shops.map(s => `<option value="${s.name}">`).join('');
+        document.getElementById('penAllShop').value = "";
+        window.filterRender('penAll');
+    };
+
+    window.resetFilters = function() {
+        ['daySaleDate', 'daySaleItem', 'penAllShop', 'penAllCat'].forEach(id => {
+            if(document.getElementById(id)) document.getElementById(id).value = "";
+        });
+        window.filterRender('daySale');
+        window.filterRender('penAll');
+    };
+
     window.render = function() {
         try {
             if(!window.db) return;
@@ -1515,6 +1599,11 @@
             document.getElementById('globalItemOptions').innerHTML = myItems.map(i => `<option value="${i.name}">`).join('');
             document.getElementById('globalShopOptions').innerHTML = myShops.map(s => `<option value="${s.name}">`).join('');
             document.getElementById('ordShopList').innerHTML = myShops.map(s => `<option value="${s.name}">`).join('');
+
+            const currentCat = document.getElementById('penAllCat') ? document.getElementById('penAllCat').value : "";
+            if (!currentCat && document.getElementById('penAllShopList')) {
+                 document.getElementById('penAllShopList').innerHTML = window.db.shops.map(s => `<option value="${s.name}">`).join('');
+            }
 
             if(isAdmin) {
                 let dealerHtml = '';
@@ -1550,6 +1639,7 @@
                 let itemsHtml = (o.items||[]).map(x => `${x.n} (Rs.${fmtNum(x.p)} x ${x.q} = Rs.${fmtNum(x.q*x.p)})`).join('<br>');
                 let grandTot = (o.items||[]).reduce((sum, x) => sum + (x.q * x.p), 0);
                 let dTd = `<td class="admin-only"><span class="badge-dealer">${o.dealer}</span></td>`;
+                // FIXED THE TYPO HERE: Changed grandTotal to grandTot
                 return `<tr><td>${(curPage['orders']-1)*PAGE_LIMIT + i+1}</td>${dTd}<td>${o.date}</td><td>${o.targetDate}</td><td>${o.shop}</td><td>${itemsHtml}<hr style="margin:4px 0; border:0; border-top:1px solid #ccc;"><strong style="color:var(--danger);">Total: Rs. ${fmtNum(grandTot)}</strong></td><td>Rs. ${fmtNum(o.adv)}</td><td style="width:130px;"><div class="action-grid"><button class="btn btn-edit" onclick="editOrder(${realIdx})">Edit</button> <button class="btn btn-save" onclick="openInvoiceCreator(${realIdx})">Inv</button> <button class="btn btn-del action-grid-full" onclick="askDelete('Order','orders',${realIdx},'${o.shop}')">Delete</button></div></td></tr>`;
             }).join('');
             renderPg(myOrders.length, 'orders', 'pg-orders');
@@ -1596,6 +1686,100 @@
                 return `<tr><td>${(curPage['del']-1)*PAGE_LIMIT + i+1}</td>${dTd}<td>${d.type}</td><td>${d.ref}</td><td style="color:red; font-weight:bold;">${d.reason}</td><td>${d.date}</td><td style="width:100px;"><div class="action-grid"><button class="btn btn-info action-grid-full" onclick="undoDelete(${realIdx})">Undo ↩</button></div></td></tr>`;
             }).join('');
             renderPg(myDeleted.length, 'del', 'pg-del');
+
+            const paCat = document.getElementById('penAllCat') ? document.getElementById('penAllCat').value : "";
+            const paShop = document.getElementById('penAllShop') ? document.getElementById('penAllShop').value : "";
+
+            let paList = window.db.sales.filter(s => {
+                const bal = s.grand - (s.adv||0) - (s.paid||0);
+                if(s.status === 'Finished' || s.status === 'Returned' || bal <= 0.01) return false;
+                if(!isAdmin && s.dealer !== currentUser) return false;
+                if(paShop && s.shop !== paShop) return false;
+                if(paCat && !paShop) {
+                    const sh = window.db.shops.find(x => x.name === s.shop);
+                    if(sh && (sh.category||'Other') !== paCat) return false;
+                }
+                return true;
+            });
+
+            paList.sort((a,b) => {
+                let shopCmp = (a.shop || '').localeCompare(b.shop || '');
+                if(shopCmp !== 0) return shopCmp;
+                return new Date(b.date) - new Date(a.date);
+            });
+
+            let totGrandPa = 0, totPaidPa = 0, totBalPa = 0;
+            paList.forEach(s => {
+                totGrandPa += s.grand;
+                totPaidPa += (s.adv||0) + (s.paid||0);
+                totBalPa += (s.grand - (s.adv||0) - (s.paid||0));
+            });
+
+            if(document.getElementById('penAllBody')) {
+                let pPa = window.getPaginated(paList, 'penAll');
+                document.getElementById('penAllBody').innerHTML = pPa.map((s, index) => {
+                    const bal = s.grand - (s.adv||0) - (s.paid||0);
+                    const realIdx = window.db.sales.indexOf(s);
+                    return `<tr><td>${(curPage['penAll']-1)*PAGE_LIMIT + index + 1}</td><td style="font-weight:bold;color:var(--primary);">${s.shop}</td><td>${s.inv}</td><td>${s.date}</td><td>${(s.items||[]).map(x=>`${x.n} (${x.q})`).join('<br>')}</td><td>Rs. ${fmtNum(s.grand)}</td><td>Rs. ${fmtNum((s.adv||0)+(s.paid||0))}</td><td style="color:red;font-weight:bold;">Rs. ${fmtNum(bal)}</td><td style="width:140px;"><div class="action-grid"><button class="btn btn-info" onclick="printInvByRef('${s.inv}')">Print</button> <button class="btn btn-pdf" onclick="downloadInvoicePDF(${realIdx})">PDF</button> <button class="btn btn-edit action-grid-full" onclick="openPayModal(${realIdx})">Pay</button></div></td></tr>`;
+                }).join('');
+                document.getElementById('penAllFooter').innerHTML = `<tr><td colspan="5" style="text-align:right;font-size:16px;"><strong>NET TOTAL DUE:</strong></td><td style="font-size:16px;color:var(--primary);"><strong>Rs. ${fmtNum(totGrandPa)}</strong></td><td style="font-size:16px;color:var(--accent);"><strong>Rs. ${fmtNum(totPaidPa)}</strong></td><td style="color:red;font-size:16px;"><strong>Rs. ${fmtNum(totBalPa)}</strong></td><td></td></tr>`;
+                window.renderPg(paList.length, 'penAll', 'pg-penAll');
+            }
+
+            const dsDate = document.getElementById('daySaleDate') ? document.getElementById('daySaleDate').value : "";
+            const dsItem = document.getElementById('daySaleItem') ? document.getElementById('daySaleItem').value : "";
+
+            let finItemsMap = {};
+            let penItemsMap = {};
+            let dsFinInc = 0, dsPenInc = 0, dsTotExp = 0, dsTotProf = 0;
+
+            if (dsDate) {
+                window.db.sales.filter(s => s.date === dsDate && s.status !== 'Returned' && (isAdmin || s.dealer === currentUser)).forEach(s => {
+                    const bal = s.grand - (s.adv||0) - (s.paid||0);
+                    const isFin = (s.status === 'Finished' || bal <= 0.01);
+
+                    (s.items||[]).forEach(it => {
+                        if(dsItem && it.n !== dsItem) return;
+
+                        let targetMap = isFin ? finItemsMap : penItemsMap;
+                        if(!targetMap[it.n]) targetMap[it.n] = { q: 0, rev: 0, cost: 0 };
+
+                        targetMap[it.n].q += it.q;
+                        const rev = (it.q * (parseFloat(it.p) || 0));
+                        targetMap[it.n].rev += rev;
+
+                        let myItems = isAdmin ? window.db.items : window.db.items.filter(i => i.dealer === currentUser);
+                        const itemRef = myItems.find(x => x.name === it.n) || {};
+                        const unitCost = it.adminP !== undefined ? parseFloat(it.adminP) : (itemRef.adminPrice || 0);
+                        const cost = (it.q * unitCost);
+                        targetMap[it.n].cost += cost;
+
+                        if(isFin) dsFinInc += rev;
+                        else dsPenInc += rev;
+
+                        dsTotExp += cost;
+                    });
+                });
+                dsTotProf = (dsFinInc + dsPenInc) - dsTotExp;
+
+                Object.keys(finItemsMap).forEach(k => finItemsMap[k].prof = finItemsMap[k].rev - finItemsMap[k].cost);
+                Object.keys(penItemsMap).forEach(k => penItemsMap[k].prof = penItemsMap[k].rev - penItemsMap[k].cost);
+            }
+
+            if(document.getElementById('dsFinInc')) {
+                document.getElementById('dsFinInc').innerText = "Rs. " + fmtNum(dsFinInc);
+                document.getElementById('dsPenInc').innerText = "Rs. " + fmtNum(dsPenInc);
+                document.getElementById('dsTotInc').innerText = "Rs. " + fmtNum(dsFinInc + dsPenInc);
+                document.getElementById('dsTotProf').innerText = "Rs. " + fmtNum(dsTotProf);
+
+                let finArr = Object.keys(finItemsMap).map(k => ({name: k, ...finItemsMap[k]}));
+                document.getElementById('daySaleFinBody').innerHTML = finArr.map(it => `<tr><td>${it.name}</td><td>${it.q}</td><td style="color:var(--accent);font-weight:bold;">Rs. ${fmtNum(it.rev)}</td><td style="color:var(--danger);">Rs. ${fmtNum(it.cost)}</td><td style="color:var(--primary);font-weight:bold;">Rs. ${fmtNum(it.prof)}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center; color:#999;">No finished sales data found for this date.</td></tr>`;
+                document.getElementById('daySaleFinFooter').innerHTML = finArr.length > 0 ? `<tr><td colspan="2" style="text-align:right;"><strong>TOTAL:</strong></td><td style="color:var(--accent);"><strong>Rs. ${fmtNum(dsFinInc)}</strong></td><td style="color:var(--danger);"><strong>Rs. ${fmtNum(finArr.reduce((a,b)=>a+b.cost,0))}</strong></td><td style="color:var(--primary);"><strong>Rs. ${fmtNum(dsFinInc - finArr.reduce((a,b)=>a+b.cost,0))}</strong></td></tr>` : "";
+
+                let penArr = Object.keys(penItemsMap).map(k => ({name: k, ...penItemsMap[k]}));
+                document.getElementById('daySalePenBody').innerHTML = penArr.map(it => `<tr><td>${it.name}</td><td>${it.q}</td><td style="color:var(--edit);font-weight:bold;">Rs. ${fmtNum(it.rev)}</td><td style="color:var(--danger);">Rs. ${fmtNum(it.cost)}</td><td style="color:var(--primary);font-weight:bold;">Rs. ${fmtNum(it.prof)}</td></tr>`).join('') || `<tr><td colspan="5" style="text-align:center; color:#999;">No pending sales data found for this date.</td></tr>`;
+                document.getElementById('daySalePenFooter').innerHTML = penArr.length > 0 ? `<tr><td colspan="2" style="text-align:right;"><strong>TOTAL:</strong></td><td style="color:var(--edit);"><strong>Rs. ${fmtNum(dsPenInc)}</strong></td><td style="color:var(--danger);"><strong>Rs. ${fmtNum(penArr.reduce((a,b)=>a+b.cost,0))}</strong></td><td style="color:var(--primary);"><strong>Rs. ${fmtNum(dsPenInc - penArr.reduce((a,b)=>a+b.cost,0))}</strong></td></tr>` : "";
+            }
 
             if(!isAdmin) { document.querySelectorAll('.admin-only').forEach(e => e.classList.add('hide-for-dealer')); }
             else { document.querySelectorAll('.admin-only').forEach(e => e.classList.remove('hide-for-dealer')); }

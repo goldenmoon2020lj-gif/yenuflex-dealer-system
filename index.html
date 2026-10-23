@@ -44,13 +44,13 @@
         // Load data from Local Storage initially to prevent UI breaking
         try {
             const c = localStorage.getItem('YENU_ERP_DB');
-            window.db = c ? JSON.parse(c) : {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], lastInvNum:1000};
+            window.db = c ? JSON.parse(c) : {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], ebook:[], routes:[], lastInvNum:1000};
         } catch(e) {
-            window.db = {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], lastInvNum:1000};
+            window.db = {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], ebook:[], routes:[], lastInvNum:1000};
         }
         
         // Ensure all arrays exist
-        ['dealers','shops','items','orders','sales','returns','deleted','notes'].forEach(k => window.db[k] = window.db[k] || []);
+        ['dealers','shops','items','orders','sales','returns','deleted','notes','ebook','routes'].forEach(k => window.db[k] = window.db[k] || []);
 
         function getItemKey(t, i) {
             if(!i) return '';
@@ -58,6 +58,8 @@
             if(t === 'Shop') return (i.dealer || '').trim().toLowerCase() + '_' + i.name;
             if(t === 'Dealer') return i.code || i.user || i.email;
             if(t === 'Sale') return i.inv;
+            if(t === 'Route') return i.id || i.name;
+            if(t === 'Ebook') return i.id;
             if(t === 'Order') return i.id || ((i.dealer || '').trim().toLowerCase() + '_' + (i.shop || '') + '_' + i.date + '_' + (i.adv || 0));
             if(t === 'Return') return (i.dealer || '').trim().toLowerCase() + '_' + i.inv + '_' + i.itemName;
             if(t === 'Note') return (i.dealer || '').trim().toLowerCase() + '_' + i.timestamp;
@@ -103,6 +105,8 @@
             m.orders = mergeArray('Order', c.orders, l.orders, c.deleted, l.deleted);
             m.returns = mergeArray('Return', c.returns, l.returns, c.deleted, l.deleted);
             m.notes = mergeArray('Note', c.notes, l.notes, c.deleted, l.deleted);
+            m.routes = mergeArray('Route', c.routes, l.routes, c.deleted, l.deleted);
+            m.ebook = mergeArray('Ebook', c.ebook, l.ebook, c.deleted, l.deleted);
             
             const mD = new Map();
             (c.deleted || []).forEach(d => { mD.set((d.type || '') + '_' + (d.ref || '') + '_' + (d.date || ''), d); });
@@ -164,7 +168,7 @@
                             if(c) {
                                 const m = typeof mergeDatabase === "function" ? mergeDatabase(c, tmpDb) : c;
                                 window.db = m;
-                                ['dealers','shops','items','orders','sales','returns','deleted','notes'].forEach(k => window.db[k] = window.db[k] || []);
+                                ['dealers','shops','items','orders','sales','returns','deleted','notes','ebook','routes'].forEach(k => window.db[k] = window.db[k] || []);
                                 localStorage.setItem('YENU_ERP_DB', JSON.stringify(window.db));
                                 if(typeof window.render === "function") window.render();
                             }
@@ -212,10 +216,10 @@
                 onValue(dataRef, (snap) => {
                     const c = snap.val();
                     if(c) {
-                        const l = window.db || {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], lastInvNum:1000};
+                        const l = window.db || {dealers:[], shops:[], items:[], orders:[], sales:[], returns:[], deleted:[], notes:[], ebook:[], routes:[], lastInvNum:1000};
                         const m = mergeDatabase(c, l);
                         window.db = m;
-                        ['dealers','shops','items','orders','sales','returns','deleted','notes'].forEach(k => window.db[k] = window.db[k] || []);
+                        ['dealers','shops','items','orders','sales','returns','deleted','notes','ebook','routes'].forEach(k => window.db[k] = window.db[k] || []);
                         
                         localStorage.setItem('YENU_ERP_DB', JSON.stringify(window.db));
                         
@@ -700,6 +704,12 @@ if(typeof window.render === "function") window.render();
         <div class="dash-card" style="border-bottom-color:#c0392b;" onclick="openGroup('grp-admin-sales')">
             <h2>👑 Dealer Invoices</h2><p>Admin sales & Your Purchases</p>
         </div>
+        <div class="dash-card" style="border-bottom-color:#2ecc71;" onclick="openGroup('grp-ebook')">
+            <h2>📗 E-Book Ledger</h2><p>Income & Expenses Record</p>
+        </div>
+        <div class="dash-card" style="border-bottom-color:#f39c12;" onclick="openGroup('grp-dist')">
+            <h2>🚚 Distribution</h2><p>Route Plan & Execution</p>
+        </div>
     </div>
 
     <!-- Sub Navigation Tabs (Dynamic) -->
@@ -947,6 +957,11 @@ if(typeof window.render === "function") window.render();
                 </div>
 
                 <div>
+                    <label style="font-weight: bold;">Tax Number:</label>
+                    <input type="text" id="shTax" placeholder="Tax Number (Optional)">
+                </div>
+
+                <div>
                     <label style="font-weight: bold;">Address:</label>
                     <input type="text" id="shAddr" placeholder="Address">
                 </div>
@@ -964,6 +979,20 @@ if(typeof window.render === "function") window.render();
                 <div>
                     <label style="font-weight: bold;">Normal No (Phone 2):</label>
                     <input type="text" id="shPh2" placeholder="Normal Number">
+                </div>
+                <div style="grid-column: span 2;">
+                    <label style="font-weight: bold;">Holidays / Closed Days: (Hold Ctrl to select multiple)</label>
+                    <select id="shHolidays" multiple style="height: 100px;">
+                        <option value="Monday">Monday</option>
+                        <option value="Tuesday">Tuesday</option>
+                        <option value="Wednesday">Wednesday</option>
+                        <option value="Thursday">Thursday</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                        <option value="Poya Day">Poya Day</option>
+                        <option value="Public Holiday">Public Holiday</option>
+                    </select>
                 </div>
                 <div style="grid-column: span 2;">
                     <label style="font-weight: bold;">Special Notes:</label>
@@ -1005,7 +1034,7 @@ if(typeof window.render === "function") window.render();
                     <th style="cursor:pointer;" style="width: 70px">Shop Image</th>
                     <th style="cursor:pointer;" onclick="sortTable('tbl-shops', 3)">Shop Name ⇕</th>
                     <th style="cursor:pointer;" onclick="sortTable('tbl-shops', 4)">Category ⇕</th>
-                    <th style="cursor:pointer;">Address</th>
+                    <th style="cursor:pointer;">Tax / Holidays</th>
                     <th style="cursor:pointer;">Location</th>
                     <th style="cursor:pointer;">Phone</th>
                     <th style="cursor:pointer;">Notes</th>
@@ -1115,10 +1144,14 @@ if(typeof window.render === "function") window.render();
     </div>
     
     <!-- ========================================== -->
-    <!-- PENDING ALL (SHOP VIEW) TAB -->
+    <!-- SHOP INVOICE HISTORY TAB (Replaced Pending All) -->
     <!-- ========================================== -->
     <div id="pending-all" class="tab-content">
         <div class="box" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; background: #fdebd0;">
+            <div style="width:100%; border-bottom: 2px solid #e67e22; padding-bottom: 10px;">
+                <h3 style="margin:0; color:#d35400;">📄 Shop Invoice History</h3>
+                <p style="margin:5px 0 0 0; font-size:13px; color:#555;">(Select a shop to view its entire invoice history, sorted by newest first)</p>
+            </div>
             <div>
                 <strong>📂 Category:</strong>
                 <select id="penAllCat" onchange="updatePenAllShops()">
@@ -1137,20 +1170,20 @@ if(typeof window.render === "function") window.render();
             <button class="btn btn-info" onclick="resetFilters()">Reset All</button>
         </div>
         
-        <button class="btn btn-pdf" style="margin-bottom: 10px;" onclick="downloadPDF('tbl-pending-all','Shop Pending Invoices Report')">📄 DOWNLOAD SHOP PENDING (PDF)</button>
+        <button class="btn btn-pdf" style="margin-bottom: 10px;" onclick="downloadPDF('tbl-pending-all','Shop Invoice History Report')">📄 DOWNLOAD SHOP INVOICES (PDF)</button>
         
         <table id="tbl-pending-all">
             <thead>
                 <tr>
                     <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 0)"># ⇕</th>
-                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 1)">Shop Name ⇕</th>
-                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 2)">Category ⇕</th>
-                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 3)">Inv No ⇕</th>
-                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 4)">Date ⇕</th>
+                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 1)">Inv No ⇕</th>
+                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 2)">Date ⇕</th>
+                    <th style="cursor:pointer;" onclick="sortTable('tbl-pending-all', 3)">Shop Name ⇕</th>
                     <th style="cursor:pointer;">Items</th>
                     <th style="cursor:pointer;">Grand Total</th>
                     <th style="cursor:pointer;">Paid</th>
                     <th style="cursor:pointer;">Balance</th>
+                    <th style="cursor:pointer;">Status</th>
                     <th style="cursor:pointer;" style="width: 140px;">Action</th>
                 </tr>
             </thead>
@@ -1799,6 +1832,158 @@ if(typeof window.render === "function") window.render();
         </table>
     </div>
 
+
+    <!-- ========================================== -->
+    <!-- NEW: E-BOOK (LEDGER) TAB -->
+    <!-- ========================================== -->
+    <div id="ebook" class="tab-content">
+        <div class="box" style="border-left: 5px solid #2ecc71;">
+            <h3 style="color: #27ae60; margin-top: 0;">📗 E-Book Ledger (Income & Expenses)</h3>
+            <p style="font-size: 13px; color: #555;">මෙම E-Book එක මඟින් Invoice වලින් ලැබෙන සියලුම ආදායම් (Income) සහ Admin/වියදම් සඳහා ගෙවීම් (Expenses) සටහන් වේ.</p>
+            <div class="grid" style="margin-bottom: 20px;">
+                <div style="background: #e8f8f5; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4>Total Income (Invoices/Sales)</h4>
+                    <h2 id="ebkTotIncome" style="color: #27ae60; margin: 0;">Rs. 0.00</h2>
+                </div>
+                <div style="background: #fdedec; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4>Total Expenses (Admin Payments)</h4>
+                    <h2 id="ebkTotExpense" style="color: #e74c3c; margin: 0;">Rs. 0.00</h2>
+                </div>
+                <div style="background: #ebf5fb; padding: 15px; border-radius: 8px; text-align: center;">
+                    <h4>Net Balance</h4>
+                    <h2 id="ebkNetBal" style="color: #2980b9; margin: 0;">Rs. 0.00</h2>
+                </div>
+            </div>
+            
+            <hr style="margin:20px 0; border:1px solid #ccc;">
+            <h4 style="color:#2c3e50; margin-top:0;">➕ Add Manual Record (Expense / Custom Income)</h4>
+            <div class="grid">
+                <div><label>Date:</label><input type="date" id="ebkDate"></div>
+                <div>
+                    <label>Type:</label>
+                    <select id="ebkType">
+                        <option value="Income">Income (+)</option>
+                        <option value="Expense">Expense (-)</option>
+                    </select>
+                </div>
+                <div><label>Amount (Rs):</label><input type="number" id="ebkAmt" placeholder="Amount"></div>
+                <div><label>Description (Note):</label><input type="text" id="ebkDesc" placeholder="e.g. Paid to Admin / Office Rent"></div>
+            </div>
+            <button class="btn btn-save" style="background:#2ecc71; margin-top:15px;" onclick="saveEbookRecord()">SAVE E-BOOK RECORD</button>
+        </div>
+        
+        <button class="btn btn-pdf" style="margin-bottom: 10px;" onclick="downloadPDF('tbl-ebook','E-Book_Ledger')">📄 DOWNLOAD E-BOOK (PDF)</button>
+        
+        <table id="tbl-ebook">
+            <thead>
+                <tr>
+                    <th style="cursor:pointer;">Date ⇕</th>
+                    <th style="cursor:pointer;">Description</th>
+                    <th style="cursor:pointer;">Type ⇕</th>
+                    <th style="cursor:pointer;">Amount (Rs) ⇕</th>
+                    <th style="cursor:pointer; width:100px;">Action</th>
+                </tr>
+            </thead>
+            <tbody id="ebookBody"></tbody>
+        </table>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- NEW: DISTRIBUTION MANAGEMENT TAB -->
+    <!-- ========================================== -->
+    <div id="dist" class="tab-content">
+        <div class="nav-tabs" style="background: #f39c12; margin-bottom: 15px; padding: 5px;">
+            <button class="active" onclick="switchDistTab('dist-dash')" id="btn-dist-dash">📊 Dashboard</button>
+            <button onclick="switchDistTab('dist-plan')" id="btn-dist-plan">🗺️ Route Plan</button>
+            <button onclick="switchDistTab('dist-exec')" id="btn-dist-exec">🚀 Execute Route (Field View)</button>
+        </div>
+        
+        <!-- Dist Dashboard -->
+        <div id="dist-dash" class="dist-sub-tab" style="display:block;">
+            <div class="grid">
+                <div class="box" style="border-left: 5px solid #2980b9;">
+                    <h3>📍 Overview of Your Routes</h3>
+                    <h1 id="distRouteCount" style="color:#2980b9; margin:0;">0</h1>
+                    <p style="margin-top:5px; font-weight:bold; color:#7f8c8d;">Total Saved Routes</p>
+                </div>
+                <div class="box" style="border-left: 5px solid #e74c3c;">
+                    <h3>🔔 Route Reminders (Due Visits)</h3>
+                    <p style="font-size:12px; color:#555;">Routes that have exceeded their Visit Interval weeks.</p>
+                    <ul id="distRemindersList" style="padding-left: 20px; color: #e74c3c; font-weight: bold; min-height: 50px;">
+                        <!-- Reminders injected via JS -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Dist Route Plan -->
+        <div id="dist-plan" class="dist-sub-tab" style="display:none;">
+            <div class="box" style="border: 1px solid #d35400;">
+                <h3 style="color:#d35400; margin-top:0;">🗺️ Create Custom Route & Smart Route Auto-Generator</h3>
+                <div class="grid">
+                    <div>
+                        <label>Route Name:</label>
+                        <input type="text" id="rtName" placeholder="e.g. Colombo South Route">
+                    </div>
+                    <div>
+                        <label>Visit Interval (Weeks):</label>
+                        <input type="number" id="rtInterval" placeholder="e.g. 2 for every 2 weeks">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label>Add Shop to Route:</label>
+                        <select id="rtShopSelect" style="width:70%; display:inline-block; padding:10px;"></select>
+                        <button class="btn btn-info" style="padding:10px 15px; margin-left:10px;" onclick="addShopToRoutePlan()">+ Add Shop</button>
+                    </div>
+                </div>
+                
+                <h4 style="margin-top:20px; color:#2c3e50;">📌 Selected Shops (Auto-sorted by closest distance)</h4>
+                <ul id="rtSelectedShops" style="list-style:none; padding:0; background:#fff; border:1px solid #ddd; padding:10px; border-radius:5px; min-height:50px;"></ul>
+                
+                <div id="rtMapPreview" style="height: 300px; width: 100%; border-radius: 10px; margin-top: 15px; border: 1px solid #ccc; z-index:1;"></div>
+                <p style="font-size:16px;"><strong>Estimated Route Distance:</strong> <span id="rtDistance" style="color:#27ae60; font-weight:bold;">0</span> km</p>
+                
+                <div style="display:flex; gap:10px; margin-top: 15px;">
+                    <button class="btn btn-save" onclick="saveRoutePlan()" style="flex:1; background:#f39c12; font-size:14px;">💾 SAVE ROUTE PLAN</button>
+                    <button class="btn btn-info" onclick="autoGenerateSmartRoute()" style="flex:1; background:#8e44ad; font-size:14px;">🤖 SMART ROUTE AUTO-GENERATOR</button>
+                </div>
+            </div>
+            
+            <h3 style="color:#2c3e50; border-bottom:2px solid #ccc; padding-bottom:5px;">📋 Saved Route Plans</h3>
+            <table id="tbl-routes" style="margin-bottom:20px;">
+                <thead>
+                    <tr>
+                        <th>Route Name</th>
+                        <th>Visit Interval (Weeks)</th>
+                        <th>Shops Count</th>
+                        <th>Last Visited Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="routesBody"></tbody>
+            </table>
+        </div>
+        
+        <!-- Dist Execute Route -->
+        <div id="dist-exec" class="dist-sub-tab" style="display:none;">
+            <div class="box" style="background:#e8f8f5; border-left:5px solid #16a085;">
+                <h3 style="color:#16a085; margin-top:0;">🚀 Execute Route (Field View)</h3>
+                <p style="font-size:13px; color:#555;">මෙම Route එක ආරම්භ කළ පසු Map එක සහ Shops පිළිවෙල පෙන්වයි.</p>
+                <label style="font-weight:bold;">Select Route to Execute Today:</label>
+                <select id="execRouteSelect" onchange="loadExecRoute()"></select>
+                <button class="btn btn-save" style="margin-top:15px; background:#16a085;" onclick="startRouteExecution()">START ROUTE NOW</button>
+            </div>
+            
+            <div id="execRouteView" style="display:none; background:#fff; padding:20px; border-radius:10px; border:1px solid #ccc;">
+                <h3 id="execCurrentRouteName" style="color:#2c3e50; text-align:center; border-bottom:2px solid #27ae60; padding-bottom:10px;"></h3>
+                <div id="execMap" style="height: 350px; width: 100%; border-radius: 10px; margin-bottom: 15px; z-index:1; border:1px solid #ddd;"></div>
+                
+                <h4 style="color:#d35400;">Shops in Order:</h4>
+                <ul id="execShopsList" style="list-style:none; padding:0;"></ul>
+                
+                <button class="btn btn-del" style="width:100%; padding:15px; font-size:16px; margin-top:20px; background:#e74c3c;" onclick="finishRouteExecution()">✅ FINISH ROUTE (MARK AS VISITED)</button>
+            </div>
+        </div>
+    </div>
 </div>
 <div id="invoice-print-area" style="display: none;">
     <div id="invoice-card">
@@ -1923,6 +2108,13 @@ let currentEditingInv = null;
 let currentOnlInv = null;
 window.activeOrdIdx = -1;
 
+// E-Book & Distribution Globals
+let routeMapInstance = null;
+let execMapInstance = null;
+let routeMarkers = [];
+let rtPolyline = null;
+let activeExecRoute = null;
+
 let curPage = {
     shops: 1, items: 1, stock: 1, orders: 1, penPay: 1, 
     overdue: 1, finPay: 1, ret: 1, del: 1, penAll: 1, 
@@ -1939,7 +2131,9 @@ const tabGroups = {
     'grp-stock': [{id:'stock',label:'📋 Inventory / Stock'}],
     'grp-misc': [{id:'returns',label:'🔄 Return Items'},{id:'deleted',label:'🗑️ Deleted Records'},{id:'notepad',label:'📓 Notepad / Alerts'},{id:'messages',label:'💬 WhatsApp & SMS'}],
     'grp-admin': [{id:'dealers',label:'👨‍💼 Manage Dealers'}],
-    'grp-admin-sales': [{id:'admin-dealer-sales',label:'👑 Dealer Invoices & Dues'}]
+    'grp-admin-sales': [{id:'admin-dealer-sales',label:'👑 Dealer Invoices & Dues'}],
+    'grp-ebook': [{id:'ebook',label:'📗 E-Book Ledger'}],
+    'grp-dist': [{id:'dist',label:'🚚 Distribution Management'}]
 };
 
 // ==========================================
@@ -2263,6 +2457,9 @@ function sync() {
     render();
     if(document.getElementById('t-growth') && document.getElementById('t-growth').classList.contains('active')) {
         window.renderGrowth();
+    }
+    if(document.getElementById('t-ebook') && document.getElementById('t-ebook').classList.contains('active')) {
+        window.renderEbook();
     }
 }
 
@@ -3198,14 +3395,26 @@ window.saveShop = function() {
         linked = rawLink.split(' - ')[0].trim();
     }
     
+    let holidaysSelect = document.getElementById('shHolidays');
+    let selectedHolidays = [];
+    if(holidaysSelect) {
+        for (let i = 0; i < holidaysSelect.options.length; i++) {
+            if (holidaysSelect.options[i].selected) {
+                selectedHolidays.push(holidaysSelect.options[i].value);
+            }
+        }
+    }
+    
     let obj = {
         dealer: currentUser, 
         name: document.getElementById('shName').value.trim(), 
         category: document.getElementById('shCat').value, 
+        taxNum: document.getElementById('shTax') ? document.getElementById('shTax').value.trim() : "",
         address: document.getElementById('shAddr').value, 
         loc: document.getElementById('shLoc').value, 
         p1: document.getElementById('shPh1').value, 
         p2: document.getElementById('shPh2').value, 
+        holidays: selectedHolidays,
         notes: document.getElementById('shNotes').value, 
         linkedDealer: linked, 
         img: tempImg || (idx > -1 ? window.db.shops[idx].img : "")
@@ -3221,11 +3430,16 @@ window.saveShop = function() {
     
     sync();
     
-    ['shName','shAddr','shLoc','shPh2','shNotes','shLinkedDlr'].forEach(id => {
-        document.getElementById(id).value = "";
+    ['shName','shTax','shAddr','shLoc','shPh2','shNotes','shLinkedDlr'].forEach(id => {
+        if(document.getElementById(id)) document.getElementById(id).value = "";
     });
     
     document.getElementById('shPh1').value = "+94";
+    if(holidaysSelect) {
+        for (let i = 0; i < holidaysSelect.options.length; i++) {
+            holidaysSelect.options[i].selected = false;
+        }
+    }
     document.getElementById('shPrev').style.display = 'none';
     tempImg = "";
     document.getElementById('editShIdx').value = "-1";
@@ -3246,10 +3460,20 @@ window.editShop = function(i) {
     }
     
     document.getElementById('shLinkedDlr').value = s.linkedDealer || "";
+    if(document.getElementById('shTax')) document.getElementById('shTax').value = s.taxNum || "";
     document.getElementById('shAddr').value = s.address || "";
     document.getElementById('shLoc').value = s.loc || "";
     document.getElementById('shPh1').value = s.p1 || "+94";
     document.getElementById('shPh2').value = s.p2 || "";
+    
+    let holidaysSelect = document.getElementById('shHolidays');
+    if(holidaysSelect) {
+        let sHols = s.holidays || [];
+        for (let j = 0; j < holidaysSelect.options.length; j++) {
+            holidaysSelect.options[j].selected = sHols.includes(holidaysSelect.options[j].value);
+        }
+    }
+    
     document.getElementById('shNotes').value = s.notes || "";
     document.getElementById('shPrev').src = s.img || "";
     document.getElementById('shPrev').style.display = s.img ? 'block' : 'none';
@@ -3301,13 +3525,33 @@ window.toggleOrdAdvMethod = function() {
 window.addOrderRow = function() {
     let d = document.createElement('div');
     d.className = "grid box";
+    d.style.position = "relative";
     d.innerHTML = `
-        <input list="ordItemOptions" class="on" placeholder="Item Name" onblur="validateItemSelect(this)" onchange="const it=window.db.items.find(x=>x.name===this.value);if(it)this.nextElementSibling.value=it.shopPrice||0;">
-        <input type="number" class="op" placeholder="Sell Price (Edit if needed)">
-        <input type="number" class="oq" placeholder="Qty">
+        <input list="ordItemOptions" class="on" placeholder="Item Name" onblur="validateItemSelect(this)" onchange="const it=window.db.items.find(x=>x.name===this.value);if(it)this.nextElementSibling.value=it.shopPrice||0; window.calcRowTotal(this);">
+        <input type="number" class="op" placeholder="Sell Price (Edit if needed)" oninput="window.calcRowTotal(this)">
+        <div style="position:relative;">
+            <span class="row-tot-lbl" style="position:absolute; top:-18px; right:5px; color:red; font-size:11px; font-weight:bold;">Rs. 0.00</span>
+            <input type="number" class="oq" placeholder="Qty" oninput="window.calcRowTotal(this)">
+        </div>
         <button class="btn btn-del" onclick="this.parentElement.remove()">REMOVE</button>
     `;
     document.getElementById('ordItemsList').appendChild(d);
+};
+
+window.calcRowTotal = function(el) {
+    let p = el.parentElement;
+    if(el.classList.contains('op') || el.classList.contains('on')) {
+        p = el.parentElement;
+    } else if(el.classList.contains('oq')) {
+        p = el.parentElement.parentElement;
+    }
+    
+    let price = parseFloat(p.querySelector('.op').value || 0);
+    let qty = parseFloat(p.querySelector('.oq').value || 0);
+    let totLbl = p.querySelector('.row-tot-lbl');
+    if(totLbl) {
+        totLbl.innerText = "Rs. " + fmtNum(price * qty);
+    }
 };
 
 // ==========================================
@@ -3364,6 +3608,14 @@ window.saveOrder = function() {
         window.sendChequeAlerts(currentUser, advAmt);
     }
     
+    // E-BOOK AUTO SYNC (Advance Payment)
+    if(advAmt > 0 && advMeth !== 'Cheque') {
+        window.db.ebook.push({
+            id: Date.now(), type: 'Income', date: obj.date, 
+            amt: advAmt, desc: `Order Advance: ${obj.shop}`, dealer: currentUser
+        });
+    }
+    
     sync();
     
     document.getElementById('ordItemsList').innerHTML = "";
@@ -3401,7 +3653,16 @@ window.editOrder = function(i) {
     (o.items || []).forEach(it => {
         let d = document.createElement('div');
         d.className = "grid box";
-        d.innerHTML = `<input list="ordItemOptions" class="on" value="${it.n}" onblur="validateItemSelect(this)" onchange="const it2=window.db.items.find(x=>x.name===this.value);if(it2)this.nextElementSibling.value=it2.shopPrice||0;"><input type="number" class="op" value="${it.p}"><input type="number" class="oq" value="${it.q}"><button class="btn btn-del" onclick="this.parentElement.remove()">REMOVE</button>`;
+        d.style.position = "relative";
+        d.innerHTML = `
+            <input list="ordItemOptions" class="on" value="${it.n}" onblur="validateItemSelect(this)" onchange="const it2=window.db.items.find(x=>x.name===this.value);if(it2)this.nextElementSibling.value=it2.shopPrice||0; window.calcRowTotal(this);">
+            <input type="number" class="op" value="${it.p}" oninput="window.calcRowTotal(this)">
+            <div style="position:relative;">
+                <span class="row-tot-lbl" style="position:absolute; top:-18px; right:5px; color:red; font-size:11px; font-weight:bold;">Rs. ${window.fmtNum(it.p * it.q)}</span>
+                <input type="number" class="oq" value="${it.q}" oninput="window.calcRowTotal(this)">
+            </div>
+            <button class="btn btn-del" onclick="this.parentElement.remove()">REMOVE</button>
+        `;
         document.getElementById('ordItemsList').appendChild(d);
     });
     
@@ -3457,13 +3718,17 @@ window.processInvoiceFinal = function() {
     const gFinal = aD + tA;
     
     const pN = parseFloat(document.getElementById('salPay').value || 0);
-    const b = gFinal - (activeInvOrder.adv || 0) - pN;
+    const adv = parseFloat(activeInvOrder.adv || 0);
+    const b = gFinal - adv - pN;
     let sM = document.getElementById('salPayMethod').value;
     let pA = [];
     
+    let saleDate = document.getElementById('salDate').value;
+    const fI = window.getNextInvoiceNumber();
+
     if(pN > 0) {
         pA.push({
-            date: document.getElementById('salDate').value, 
+            date: saleDate, 
             amt: pN, 
             method: sM, 
             bank: document.getElementById('salBank').value, 
@@ -3474,15 +3739,23 @@ window.processInvoiceFinal = function() {
             note: document.getElementById('salNote').value, 
             cqStatus: sM === 'Cheque' ? 'Pending' : ''
         });
+        
+        // E-BOOK AUTO SYNC (Invoice spot payment)
+        if(sM !== 'Cheque') {
+            window.db.ebook.push({
+                id: Date.now(), type: 'Income', date: saleDate, 
+                amt: pN, desc: `Invoice Payment: ${fI} (${activeInvOrder.shop})`, 
+                dealer: currentUser
+            });
+        }
     }
     
-    const fI = window.getNextInvoiceNumber();
     document.getElementById('salInv').value = fI;
     
     let sale = {
         dealer: (activeInvOrder.dealer || "").trim().toLowerCase(), 
         inv: fI, 
-        date: document.getElementById('salDate').value, 
+        date: saleDate, 
         shop: document.getElementById('salShopSelect').value, 
         items: activeInvOrder.items, 
         subTotal: sub, 
@@ -3491,7 +3764,7 @@ window.processInvoiceFinal = function() {
         taxPerc: tP, 
         taxAmt: tA, 
         grand: gFinal, 
-        adv: activeInvOrder.adv, 
+        adv: adv, 
         advDate: activeInvOrder.advDate, 
         advMethod: activeInvOrder.advMethod, 
         advBank: activeInvOrder.advBank, 
@@ -3633,15 +3906,14 @@ window.confirmPay = function() {
     const i = parseInt(document.getElementById('payModalIdx').value);
     const a = parseFloat(document.getElementById('payModalAmt').value);
     let m = document.getElementById('payModalMethod').value;
+    let pDate = document.getElementById('payModalDate').value;
     
     if(a > 0) {
         window.db.sales[i].paid = (window.db.sales[i].paid || 0) + a;
         if(!window.db.sales[i].payments) window.db.sales[i].payments = [];
         
         window.db.sales[i].payments.push({
-            date: document.getElementById('payModalDate').value, 
-            amt: a, 
-            method: m, 
+            date: pDate, amt: a, method: m, 
             bank: document.getElementById('payModalBank').value, 
             acc: document.getElementById('payModalAcc').value, 
             slip: document.getElementById('payModalSlip').value, 
@@ -3653,14 +3925,23 @@ window.confirmPay = function() {
         
         const b = window.db.sales[i].grand - (window.db.sales[i].adv || 0) - window.db.sales[i].paid;
         if(b <= 0.01) window.db.sales[i].status = 'Finished';
-        if(m === 'Cheque') window.sendChequeAlerts(currentUser, a);
+        
+        if(m === 'Cheque') {
+            window.sendChequeAlerts(currentUser, a);
+        } else {
+            // E-BOOK AUTO SYNC (Later Payment)
+            window.db.ebook.push({
+                id: Date.now(), type: 'Income', date: pDate, 
+                amt: a, desc: `Later Payment: ${window.db.sales[i].inv} (${window.db.sales[i].shop})`, 
+                dealer: currentUser
+            });
+        }
 
         let sh = window.db.shops.find(x => x.name === window.db.sales[i].shop);
         if(sh && sh.p1) {
             let smsConfirm = confirm("Payment eka add wuna. Shop ekata SMS eken danuwath karannada?");
             if(smsConfirm) {
-                let pDate = document.getElementById('payModalDate').value;
-                let smsMsg = `Payment Received!\nDate: ${pDate}\nInv: ${window.db.sales[i].inv}\nInvoice Total: Rs.${window.fmtNum(window.db.sales[i].grand)}\nPaid Today: Rs.${window.fmtNum(a)}\nTotal Paid: Rs.${window.fmtNum(window.db.sales[i].paid)}\nRemaining Balance: Rs.${window.fmtNum(b)}`;
+                let smsMsg = `Payment Received!\nDate: ${pDate}\nInv: ${window.db.sales[i].inv}\nInvoice Total: Rs.${window.fmtNum(window.db.sales[i].grand)}\nPaid Today: Rs.${window.fmtNum(a)}\nTotal Paid: Rs.${window.fmtNum((window.db.sales[i].adv||0) + window.db.sales[i].paid)}\nRemaining Balance: Rs.${window.fmtNum(b)}`;
                 window.sendSmsWebhook(sh.p1, smsMsg);
             }
         }
@@ -4322,7 +4603,7 @@ window.render = function() {
                     <td><img src="${s.img || ''}" class="thumb" onclick="openLightbox(this.src)" onerror="this.style.display='none'"></td>
                     <td>${s.name}</td>
                     <td>${s.category || 'Other'}</td>
-                    <td>${s.address}</td>
+                    <td>${s.taxNum || 'No Tax'}<br><small style="color:#e67e22;">${(s.holidays||[]).join(', ')||'No Holidays'}</small></td>
                     <td>${mL}</td>
                     <td>WA: ${s.p1 || '-'}<br>Nor: ${s.p2 || '-'}</td>
                     <td>${s.notes || '-'}</td>
@@ -4781,71 +5062,7 @@ window.render = function() {
             renderPg(mDData.length, 'del', 'pg-del');
         }
         
-        // --- 15. PENDING ALL INVOICES (SHOP VIEW) WITH CATEGORY FILTER ---
-        const pAC = document.getElementById('penAllCat') ? document.getElementById('penAllCat').value : "";
-        const pAS = document.getElementById('penAllShop') ? document.getElementById('penAllShop').value : "";
-        
-        let pAL = window.db.sales.filter(s => {
-            const b = s.grand - (s.adv || 0) - (s.paid || 0);
-            if(s.status === 'Finished' || s.status === 'Returned' || b <= 0.01) return false;
-            if(!isAdmin && (s.dealer || "").trim().toLowerCase() !== currentUser) return false;
-            if(pAS && s.shop !== pAS) return false;
-            
-            let shObj = window.db.shops.find(x => x.name === s.shop);
-            if(pAC) {
-                if(!shObj) return false;
-                if((shObj.category || 'Other') !== pAC) return false;
-            }
-            return true;
-        });
-        
-        pAL.sort((a,b) => {
-            let sC = (a.shop || '').localeCompare(b.shop || '');
-            if(sC !== 0) return sC;
-            return new Date(b.date) - new Date(a.date);
-        });
-        
-        let tGP = 0, tPP = 0, tBP = 0;
-        pAL.forEach(s => {
-            tGP += s.grand;
-            tPP += (s.adv || 0) + (s.paid || 0);
-            tBP += (s.grand - (s.adv || 0) - (s.paid || 0));
-        });
-        
-        if(document.getElementById('penAllBody')) {
-            let pPa = window.getPaginated(pAL, 'penAll');
-            document.getElementById('penAllBody').innerHTML = pPa.map((s, i) => {
-                const b = s.grand - (s.adv || 0) - (s.paid || 0);
-                const rI = window.db.sales.indexOf(s);
-                let sCat = "Other";
-                let sObj = window.db.shops.find(x => x.name === s.shop);
-                if(sObj && sObj.category) sCat = sObj.category;
-                
-                return `<tr>
-                    <td>${(curPage['penAll'] - 1) * PAGE_LIMIT + i + 1}</td>
-                    <td style="font-weight:bold;color:var(--primary);">${s.shop}</td>
-                    <td>${sCat}</td>
-                    <td><a href="javascript:void(0)" onclick="showPaymentHistory(\'${s.inv}\')" style="color:#2980b9;text-decoration:underline;font-weight:bold;">${s.inv}</a></td>
-                    <td>${s.date}</td>
-                    <td>${(s.items || []).map(x => `${x.n} (${x.q})`).join('<br>')}</td>
-                    <td>Rs. ${fmtNum(s.grand)}</td>
-                    <td>Rs. ${fmtNum((s.adv || 0) + (s.paid || 0))}</td>
-                    <td style="color:red;font-weight:bold;">Rs. ${fmtNum(b)}</td>
-                    <td style="width:140px;"><div class="action-grid"><button class="btn btn-info" onclick="printInvByRef('${s.inv}')">Print</button> <button class="btn btn-pdf" onclick="downloadInvoicePDF(${rI})">PDF</button> <button class="btn btn-edit action-grid-full" onclick="changeTab('pending-pay');openPayModal(${rI})">Pay</button></div></td>
-                </tr>`;
-            }).join('');
-            
-            document.getElementById('penAllFooter').innerHTML = `
-                <tr>
-                    <td colspan="5" style="text-align:right;font-size:16px;"><strong>NET TOTAL DUE:</strong></td>
-                    <td style="font-size:16px;color:var(--primary);"><strong>Rs. ${fmtNum(tGP)}</strong></td>
-                    <td style="font-size:16px;color:var(--accent);"><strong>Rs. ${fmtNum(tPP)}</strong></td>
-                    <td style="color:red;font-size:16px;"><strong>Rs. ${fmtNum(tBP)}</strong></td>
-                    <td></td>
-                </tr>
-            `;
-            window.renderPg(pAL.length, 'penAll', 'pg-penAll');
-        }
+
 
         // --- 16. ADMIN DEALER SALES RENDER ---
         if(document.getElementById('adminDlrSalesPenBody')) {
@@ -5175,6 +5392,397 @@ window.saveEditedPayment = function() {
     document.getElementById('editPayModal').style.display = 'none';
     sync();
     window.showPaymentHistory(invNo);
+};
+
+
+// ==========================================
+// E-BOOK (LEDGER) LOGIC
+// ==========================================
+window.saveEbookRecord = function() {
+    let d = document.getElementById('ebkDate').value;
+    let t = document.getElementById('ebkType').value;
+    let a = parseFloat(document.getElementById('ebkAmt').value);
+    let ds = document.getElementById('ebkDesc').value;
+    
+    if(!d || isNaN(a) || a <= 0 || !ds) return alert("Please fill all E-Book fields accurately!");
+    
+    window.db.ebook.push({ id: Date.now(), type: t, date: d, amt: a, desc: ds, dealer: currentUser });
+    sync();
+    
+    document.getElementById('ebkDate').value = "";
+    document.getElementById('ebkAmt').value = "";
+    document.getElementById('ebkDesc').value = "";
+    alert("E-Book Record Saved Successfully!");
+};
+
+window.renderEbook = function() {
+    let inc = 0, exp = 0;
+    let ebkData = isAdmin ? window.db.ebook : window.db.ebook.filter(e => e.dealer === currentUser);
+    
+    // Sort by newest first
+    ebkData.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    let h = '';
+    ebkData.forEach((e) => {
+        if(e.type === 'Income') inc += parseFloat(e.amt);
+        if(e.type === 'Expense') exp += parseFloat(e.amt);
+        
+        let tColor = e.type === 'Income' ? '#27ae60' : '#e74c3c';
+        let act = isAdmin ? `<button class="btn btn-del" style="padding:4px 8px;" onclick="deleteEbookRecord(${e.id})">Del</button>` : `-`;
+        
+        h += `<tr>
+            <td>${e.date}</td>
+            <td>${e.desc}</td>
+            <td style="color:${tColor}; font-weight:bold;">${e.type}</td>
+            <td style="color:${tColor}; font-weight:bold;">Rs. ${fmtNum(e.amt)}</td>
+            <td>${act}</td>
+        </tr>`;
+    });
+
+    if(document.getElementById('ebkTotIncome')) {
+        document.getElementById('ebkTotIncome').innerText = "Rs. " + fmtNum(inc);
+        document.getElementById('ebkTotExpense').innerText = "Rs. " + fmtNum(exp);
+        document.getElementById('ebkNetBal').innerText = "Rs. " + fmtNum(inc - exp);
+        document.getElementById('ebookBody').innerHTML = h || `<tr><td colspan="5" style="text-align:center;">No E-Book records found.</td></tr>`;
+    }
+};
+
+window.deleteEbookRecord = function(id) {
+    if(confirm("Delete this E-Book ledger record?")) {
+        window.db.ebook = window.db.ebook.filter(e => e.id !== id);
+        sync();
+    }
+};
+
+// ==========================================
+// DISTRIBUTION & ROUTE PLAN LOGIC
+// ==========================================
+window._tempRouteShops = [];
+
+window.switchDistTab = function(tabId) {
+    document.querySelectorAll('.dist-sub-tab').forEach(e => e.style.display = 'none');
+    document.querySelectorAll('#dist .nav-tabs button').forEach(e => e.classList.remove('active'));
+    document.getElementById(tabId).style.display = 'block';
+    document.getElementById('btn-' + tabId).classList.add('active');
+    
+    if(tabId === 'dist-dash') {
+        let routesList = window.db.routes.filter(r => isAdmin || r.dealer === currentUser);
+        document.getElementById('distRouteCount').innerText = routesList.length;
+        
+        let remHtml = "";
+        routesList.forEach(r => {
+            if(r.lastVisited && r.interval) {
+                let diffDays = Math.floor((new Date().getTime() - new Date(r.lastVisited).getTime()) / (1000 * 3600 * 24));
+                let intDays = parseInt(r.interval) * 7;
+                if(diffDays > intDays) {
+                    remHtml += `<li>🚨 Route <strong>${r.name}</strong> is overdue by ${diffDays - intDays} days!</li>`;
+                }
+            }
+        });
+        document.getElementById('distRemindersList').innerHTML = remHtml || `<li style="color:#27ae60;">✅ No pending route reminders.</li>`;
+    }
+    
+    if(tabId === 'dist-plan') {
+        document.getElementById('rtShopSelect').innerHTML = `<option value="">-- Select Shop --</option>` + 
+            window.db.shops.filter(s => isAdmin || (s.dealer||"").trim().toLowerCase() === currentUser)
+            .map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+        
+        if(!routeMapInstance) {
+            setTimeout(() => {
+                routeMapInstance = L.map('rtMapPreview').setView([7.8731, 80.7718], 7);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(routeMapInstance);
+            }, 300);
+        }
+    }
+    
+    if(tabId === 'dist-exec') {
+        let execRoutes = window.db.routes.filter(r => isAdmin || r.dealer === currentUser);
+        document.getElementById('execRouteSelect').innerHTML = `<option value="">-- Select Route to Execute --</option>` + 
+            execRoutes.map(r => `<option value="${r.id}">${r.name} (${r.shops.length} Shops)</option>`).join('');
+            
+        if(!execMapInstance) {
+            setTimeout(() => {
+                execMapInstance = L.map('execMap').setView([7.8731, 80.7718], 7);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(execMapInstance);
+            }, 300);
+        }
+    }
+};
+
+window.addShopToRoutePlan = function() {
+    let sName = document.getElementById('rtShopSelect').value;
+    if(!sName) return;
+    if(window._tempRouteShops.some(x => x.name === sName)) return alert("Shop already added to this route!");
+    
+    let shopData = window.db.shops.find(x => x.name === sName);
+    if(shopData && shopData.loc && shopData.loc.includes(',')) {
+        window._tempRouteShops.push(shopData);
+        window.renderTempRoute();
+    } else {
+        alert("This shop does not have Google Map Coordinates set. Please set it in Register Shops tab first.");
+    }
+};
+
+window.autoGenerateSmartRoute = function() {
+    if(window._tempRouteShops.length < 2) return alert("Add at least 2 shops to calculate a smart route.");
+    
+    let sorted = [window._tempRouteShops[0]];
+    let unsorted = window._tempRouteShops.slice(1);
+    
+    while(unsorted.length > 0) {
+        let last = sorted[sorted.length - 1];
+        let lastLat = parseFloat(last.loc.split(',')[0]);
+        let lastLng = parseFloat(last.loc.split(',')[1]);
+        
+        let nearestIdx = 0;
+        let minD = Infinity;
+        
+        unsorted.forEach((s, idx) => {
+            let sLat = parseFloat(s.loc.split(',')[0]);
+            let sLng = parseFloat(s.loc.split(',')[1]);
+            let d = Math.sqrt(Math.pow(sLat - lastLat, 2) + Math.pow(sLng - lastLng, 2));
+            if(d < minD) { minD = d; nearestIdx = idx; }
+        });
+        
+        sorted.push(unsorted[nearestIdx]);
+        unsorted.splice(nearestIdx, 1);
+    }
+    
+    window._tempRouteShops = sorted;
+    window.renderTempRoute();
+    alert("Smart Route Generated successfully based on shortest coordinates!");
+};
+
+window.renderTempRoute = function() {
+    let h = '';
+    let latlngs = [];
+    let totDist = 0;
+    
+    routeMarkers.forEach(m => routeMapInstance.removeLayer(m));
+    if(rtPolyline) routeMapInstance.removeLayer(rtPolyline);
+    routeMarkers = [];
+    
+    window._tempRouteShops.forEach((s, i) => {
+        h += `<li style="padding:8px; border-bottom:1px solid #eee; display:flex; justify-content:space-between;">
+            <span><b>${i+1}.</b> ${s.name}</span> 
+            <button class="btn btn-del" style="padding:2px 8px;" onclick="window._tempRouteShops.splice(${i},1); window.renderTempRoute();">X</button>
+        </li>`;
+        
+        let coords = s.loc.split(',');
+        let lat = parseFloat(coords[0]), lng = parseFloat(coords[1]);
+        latlngs.push([lat, lng]);
+        
+        let m = L.marker([lat, lng]).addTo(routeMapInstance).bindPopup(`${i+1}. ${s.name}`);
+        routeMarkers.push(m);
+        
+        if(i > 0) {
+            let prevC = window._tempRouteShops[i-1].loc.split(',');
+            let pLat = parseFloat(prevC[0]), pLng = parseFloat(prevC[1]);
+            let d = Math.sqrt(Math.pow(lat - pLat, 2) + Math.pow(lng - pLng, 2)) * 111; 
+            totDist += d;
+        }
+    });
+    
+    document.getElementById('rtSelectedShops').innerHTML = h || 'No shops selected.';
+    document.getElementById('rtDistance').innerText = totDist.toFixed(2);
+    
+    if(latlngs.length > 0) {
+        rtPolyline = L.polyline(latlngs, {color: '#f39c12', weight: 4}).addTo(routeMapInstance);
+        routeMapInstance.fitBounds(rtPolyline.getBounds(), {padding: [20, 20]});
+    }
+};
+
+window.saveRoutePlan = function() {
+    let n = document.getElementById('rtName').value.trim();
+    let iv = document.getElementById('rtInterval').value;
+    
+    if(!n || !iv || window._tempRouteShops.length === 0) return alert("Fill Route Name, Interval and Add Shops!");
+    
+    window.db.routes.push({
+        id: 'RT_' + Date.now(),
+        dealer: currentUser,
+        name: n,
+        interval: iv,
+        shops: window._tempRouteShops.map(s => s.name),
+        distance: document.getElementById('rtDistance').innerText,
+        lastVisited: null
+    });
+    
+    sync();
+    
+    document.getElementById('rtName').value = "";
+    document.getElementById('rtInterval').value = "";
+    window._tempRouteShops = [];
+    window.renderTempRoute();
+    alert("Route Plan Saved!");
+};
+
+window.loadExecRoute = function() {
+    let rId = document.getElementById('execRouteSelect').value;
+    if(!rId) { 
+        document.getElementById('execRouteView').style.display = 'none'; 
+        return; 
+    }
+    let rt = window.db.routes.find(x => x.id === rId);
+    if(!rt) return;
+
+    document.getElementById('execCurrentRouteName').innerText = "Current Route: " + rt.name;
+
+    if(window._execMarkers) window._execMarkers.forEach(m => execMapInstance.removeLayer(m));
+    if(window._execPolyline) execMapInstance.removeLayer(window._execPolyline);
+    window._execMarkers = [];
+
+    let latlngs = [];
+    let h = '';
+    rt.shops.forEach((sName, i) => {
+        let shop = window.db.shops.find(x => x.name === sName);
+        if(shop && shop.loc) {
+            let lat = parseFloat(shop.loc.split(',')[0]);
+            let lng = parseFloat(shop.loc.split(',')[1]);
+            latlngs.push([lat, lng]);
+            
+            let m = L.marker([lat, lng]).addTo(execMapInstance).bindPopup(`<b>${i+1}. ${sName}</b>`);
+            window._execMarkers.push(m);
+            
+            h += `<li style="padding:15px; margin-bottom:10px; background:#fdfefe; border:1px solid #bdc3c7; border-left:5px solid #2980b9; border-radius:5px;">
+                <b style="font-size:16px; color:#2c3e50;">${i+1}. ${sName}</b><br>
+                <small style="color:#555;">Address: ${shop.address || '-'}</small><br>
+                <small style="color:#555;">Phone: ${shop.p1 || '-'}</small>
+                <div style="margin-top:10px; display:flex; gap:10px;">
+                    <button class="btn btn-info" style="flex:1; padding:8px;" onclick="openMap('${shop.loc}')">🗺️ Navigate</button>
+                    <button class="btn btn-save" style="flex:1; padding:8px; background:#f39c12;" onclick="changeTab('orders'); document.getElementById('ordShopSelect').value='${sName}'; window.updateOrderItemsList(); window.scrollTo(0,0);">📝 Take Order</button>
+                </div>
+            </li>`;
+        }
+    });
+
+    document.getElementById('execShopsList').innerHTML = h;
+
+    if(latlngs.length > 0) {
+        window._execPolyline = L.polyline(latlngs, {color: '#2980b9', weight: 4}).addTo(execMapInstance);
+        execMapInstance.fitBounds(window._execPolyline.getBounds(), {padding: [20, 20]});
+    }
+};
+
+window.startRouteExecution = function() {
+    if(!document.getElementById('execRouteSelect').value) return alert("Please select a route first!");
+    document.getElementById('execRouteView').style.display = 'block';
+    
+    setTimeout(() => { 
+        execMapInstance.invalidateSize(); 
+        if(window._execPolyline) {
+            execMapInstance.fitBounds(window._execPolyline.getBounds(), {padding: [20, 20]});
+        }
+    }, 300);
+    
+    alert("Route Started! Follow the shop order list.");
+};
+
+window.finishRouteExecution = function() {
+    let rId = document.getElementById('execRouteSelect').value;
+    let rt = window.db.routes.find(x => x.id === rId);
+    if(rt) {
+        rt.lastVisited = new Date().toISOString().substr(0, 10);
+        sync();
+        alert(`Route '${rt.name}' marked as FINISHED today!`);
+        document.getElementById('execRouteView').style.display = 'none';
+        document.getElementById('execRouteSelect').value = "";
+        switchDistTab('dist-dash');
+    }
+};
+
+window.renderRoutes = function() {
+    let routesList = window.db.routes.filter(r => isAdmin || r.dealer === currentUser);
+    let h = '';
+    routesList.forEach((r, i) => {
+        h += `<tr>
+            <td style="font-weight:bold; color:var(--primary);">${r.name}</td>
+            <td>${r.interval} Weeks</td>
+            <td>${r.shops.length} Shops</td>
+            <td><strong style="color:var(--accent);">${r.lastVisited || 'Never'}</strong></td>
+            <td><button class="btn btn-del" onclick="deleteRoute('${r.id}')">Delete</button></td>
+        </tr>`;
+    });
+    let rb = document.getElementById('routesBody');
+    if(rb) rb.innerHTML = h || `<tr><td colspan="5" style="text-align:center;">No Routes found.</td></tr>`;
+};
+
+window.deleteRoute = function(id) {
+    if(confirm("Delete this route plan?")) {
+        window.db.routes = window.db.routes.filter(r => r.id !== id);
+        sync();
+        switchDistTab('dist-plan');
+    }
+};
+
+window.renderShopInvoiceHistory = function() {
+    const pAC = document.getElementById('penAllCat') ? document.getElementById('penAllCat').value : "";
+    const pAS = document.getElementById('penAllShop') ? document.getElementById('penAllShop').value : "";
+    
+    let pAL = window.db.sales.filter(s => {
+        if(!isAdmin && (s.dealer || "").trim().toLowerCase() !== currentUser) return false;
+        if(pAS && s.shop !== pAS) return false;
+        
+        let shObj = window.db.shops.find(x => x.name === s.shop);
+        if(pAC) {
+            if(!shObj) return false;
+            if((shObj.category || 'Other') !== pAC) return false;
+        }
+        return true;
+    });
+    
+    pAL.sort((a,b) => new Date(b.date) - new Date(a.date)); 
+    
+    let tGP = 0, tPP = 0, tBP = 0;
+    pAL.forEach(s => {
+        tGP += s.grand;
+        tPP += (s.adv || 0) + (s.paid || 0);
+        let b = s.grand - (s.adv || 0) - (s.paid || 0);
+        if(b > 0) tBP += b;
+    });
+    
+    if(document.getElementById('penAllBody')) {
+        let pPa = window.getPaginated(pAL, 'penAll');
+        document.getElementById('penAllBody').innerHTML = pPa.map((s, i) => {
+            const b = s.grand - (s.adv || 0) - (s.paid || 0);
+            const rI = window.db.sales.indexOf(s);
+            let stColor = s.status === 'Finished' ? 'green' : (s.status === 'Returned' ? 'orange' : 'red');
+            
+            return `<tr>
+                <td>${(curPage['penAll'] - 1) * PAGE_LIMIT + i + 1}</td>
+                <td><a href="javascript:void(0)" onclick="showPaymentHistory(\'${s.inv}\')" style="color:#2980b9;text-decoration:underline;font-weight:bold;">${s.inv}</a></td>
+                <td>${s.date}</td>
+                <td style="font-weight:bold;color:var(--primary);">${s.shop}</td>
+                <td>${(s.items || []).map(x => `${x.n} (${x.q})`).join('<br>')}</td>
+                <td>Rs. ${fmtNum(s.grand)}</td>
+                <td>Rs. ${fmtNum((s.adv || 0) + (s.paid || 0))}</td>
+                <td style="color:red;font-weight:bold;">Rs. ${fmtNum(b <= 0.01 ? 0 : b)}</td>
+                <td style="color:${stColor};font-weight:bold;">${s.status}</td>
+                <td style="width:140px;"><div class="action-grid"><button class="btn btn-info" onclick="printInvByRef('${s.inv}')">Print</button> <button class="btn btn-pdf" onclick="downloadInvoicePDF(${rI})">PDF</button> ${b > 0.01 && s.status !== 'Returned' ? `<button class="btn btn-edit action-grid-full" onclick="changeTab('pending-pay');openPayModal(${rI})">Pay</button>` : ''}</div></td>
+            </tr>`;
+        }).join('');
+        
+        document.getElementById('penAllFooter').innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align:right;font-size:16px;"><strong>HISTORY TOTALS:</strong></td>
+                <td style="font-size:16px;color:var(--primary);"><strong>Rs. ${fmtNum(tGP)}</strong></td>
+                <td style="font-size:16px;color:var(--accent);"><strong>Rs. ${fmtNum(tPP)}</strong></td>
+                <td style="color:red;font-size:16px;"><strong>Rs. ${fmtNum(tBP)}</strong></td>
+                <td colspan="2"></td>
+            </tr>
+        `;
+        window.renderPg(pAL.length, 'penAll', 'pg-penAll');
+    }
+};
+
+const originalRenderSystem = window.render;
+window.render = function() {
+    if (typeof originalRenderSystem === 'function') {
+        originalRenderSystem(); 
+    }
+    window.renderShopInvoiceHistory(); 
+    window.renderRoutes();
+    window.renderEbook();
 };
 
 // AUTO SORT

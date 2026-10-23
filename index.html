@@ -2612,7 +2612,7 @@ window.deleteNote = function(idx) {
 };
 
 window.sendSmsWebhook = function(pN, mB) {
-    const b = "https://trigger.macrodroid.com/fe0f2d4c-eca6-413b-a8f6-b8f01671a647/sendsms";
+    const b = "https://trigger.macrodroid.com/04e853c9-0737-4556-9cc4-f7a197eb86f2/sendsms";
     fetch(`${b}?${new URLSearchParams({phone_number: pN, msg_body: mB}).toString()}`, {method: 'GET', mode: 'no-cors'}).catch(e => console.error(e));
 };
 
